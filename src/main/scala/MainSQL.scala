@@ -1,4 +1,5 @@
 import com.vividsolutions.jts.geom.Geometry
+import org.apache.spark.api.java.JavaRDD
 import org.apache.spark.serializer.KryoSerializer
 import org.apache.spark.sql.SparkSession
 import org.datasyslab.geospark.enums.{GridType, IndexType}
@@ -16,20 +17,23 @@ object MainSQL {
       .master("local[*]") // Delete this if run in cluster mode
       .appName("readTestScala") // Change this to a proper name
       // Enable GeoSpark custom Kryo serializer
+      .config("geospark.join.numpartition", "5")
       .config("spark.serializer", classOf[KryoSerializer].getName)
       .config("spark.kryo.registrator", classOf[GeoSparkKryoRegistrator].getName)
       .getOrCreate()
     GeoSparkSQLRegistrator.registerAll(session)
     session.sparkContext.setLogLevel("ERROR")
 
-    val shapesRDD = ShapefileReader.readToGeometryRDD(session.sparkContext, "/Users/pedromorfeu/Downloads/portugal-latest-free.shp/gis_osm_pois_a_free_1.shp")
+    System.setProperty("geospark.global.charset","utf8")
 
-    println("total: " + shapesRDD.count())
+    val shapesRDD = ShapefileReader.readToGeometryRDD(session.sparkContext, "/Users/pedromorfeu/Downloads/portugal-latest-free.shp/pois")
 
-    println("first: " + shapesRDD.first())
+    println("total: " + shapesRDD.countWithoutDuplicates())
+    println("first: " + shapesRDD.rawSpatialRDD.first())
 
-    val shapesSpatialRDD = new SpatialRDD[Geometry]
-    shapesSpatialRDD.rawSpatialRDD = shapesRDD
+    //val shapesSpatialRDD = new SpatialRDD[Geometry]
+    //shapesSpatialRDD.rawSpatialRDD = shapesRDD.asInstanceOf[JavaRDD[Geometry]]
+    val shapesSpatialRDD = shapesRDD
 
     shapesSpatialRDD.CRSTransform("epsg:4326", "epsg:3035")
 
@@ -42,7 +46,7 @@ object MainSQL {
     shapesSpatialRDD.analyze()
     println(shapesSpatialRDD.boundaryEnvelope)
 
-    val shapesDF = Adapter.toDf(shapesSpatialRDD, session)
+    val shapesDF = Adapter.toDf(shapesSpatialRDD, session).select("geometry").withColumnRenamed("geometry", "rddshape")
     shapesDF.printSchema()
     shapesDF.show(3, false)
     shapesDF.createOrReplaceTempView("shapes")

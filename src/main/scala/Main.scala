@@ -1,4 +1,5 @@
 import com.vividsolutions.jts.geom.Geometry
+import org.apache.spark.api.java.JavaRDD
 import org.apache.spark.{SparkConf, SparkContext}
 import org.apache.spark.serializer.KryoSerializer
 import org.apache.spark.sql.SparkSession
@@ -22,14 +23,16 @@ object Main {
     val sc = new SparkContext(conf)
     sc.setLogLevel("ERROR")
 
-    val shapesRDD = ShapefileReader.readToGeometryRDD(sc, "/Users/pedromorfeu/Downloads/portugal-latest-free.shp/gis_osm_pois_a_free_1.shp")
+    System.setProperty("geospark.global.charset","utf8")
 
-    println("total: " + shapesRDD.count())
+    val shapesRDD = ShapefileReader.readToGeometryRDD(sc, "/Users/pedromorfeu/Downloads/portugal-latest-free.shp/pois")
 
-    println("first: " + shapesRDD.first())
+    println("total: " + shapesRDD.countWithoutDuplicates())
+    println("first: " + shapesRDD.rawSpatialRDD.first())
 
-    val shapesSpatialRDD = new SpatialRDD[Geometry]
-    shapesSpatialRDD.rawSpatialRDD = shapesRDD
+    //val shapesSpatialRDD = new SpatialRDD[Geometry]
+    //shapesSpatialRDD.rawSpatialRDD = shapesRDD.asInstanceOf[JavaRDD[Geometry]]
+    val shapesSpatialRDD = shapesRDD
 
     shapesSpatialRDD.CRSTransform("epsg:4326", "epsg:3035")
 
