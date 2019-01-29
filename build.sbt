@@ -1,4 +1,4 @@
-name := "geospark-demo"
+name := "geospark-sample"
 
 version := "0.1"
 
